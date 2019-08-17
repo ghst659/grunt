@@ -2,6 +2,7 @@
 package grunt
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -21,6 +22,8 @@ func (g *Grunt) Run(r interface{}) (e error) {
 		e = g.doCmd(r)
 	case func() error:
 		e = g.doFun(r)
+	default:
+		e = fmt.Errorf("unsupported Run arg: %v", r)
 	}
 	return
 }
@@ -33,7 +36,7 @@ func (g *Grunt) doFun(f func() error) (e error) {
 	g.Log.Printf("%s: %s", prefix, getFuncName(f))
 	if !g.Noop {
 		if e = f(); e != nil {
-			g.Log.Print("ERROR: %v", e)
+			g.Log.Printf("ERROR: %v", e)
 		}
 	}
 	return
@@ -53,7 +56,7 @@ func (g *Grunt) doCmd(cmdvec []string) (e error) {
 			Stderr: os.Stderr,
 		}
 		if e = cmd.Run(); e != nil {
-			g.Log.Print("ERROR: %v", e)
+			g.Log.Printf("ERROR: %v", e)
 		}
 	}
 	return
