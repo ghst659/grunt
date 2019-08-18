@@ -48,6 +48,7 @@ func TestRunCommand(t *testing.T) {
 }
 
 func TestRunFunction(t *testing.T) {
+	stateVar := "BEFORE"
 	cases := []struct {
 		cmd func() error
 		err bool
@@ -60,20 +61,81 @@ func TestRunFunction(t *testing.T) {
 			cmd: func() error { return fmt.Errorf("deliberate error") },
 			err: true,
 		},
+		{
+			cmd: func() error {
+				stateVar = "TRANSITION 0"
+				return nil
+			},
+			err: false,
+		},
+		{
+			cmd: func() error {
+				stateVar = "TRANSITION 1"
+				return nil
+			},
+			err: false,
+		},
 	}
 	g := Grunt{
 		Noop: false,
 		Log:  log.New(os.Stderr, "TEST: ", log.Ldate|log.Ltime|log.Lshortfile),
 	}
-	for _, c := range cases {
-		err := g.Run(c.cmd)
-		if c.err && err == nil {
-			t.Errorf("missing expected error")
-		}
-		if !c.err {
+	for i, c := range cases {
+		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			err := g.Run(c.cmd)
+			if c.err && err == nil {
+				t.Errorf("missing expected error")
+			}
+			if !c.err {
+				t.Logf("State: %q", stateVar)
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestNoop(t *testing.T) {
+	stateVar := "BEFORE"
+	lastState := stateVar
+	cases := []struct {
+		dry bool
+		cmd func() error
+	}{
+		{
+			dry: true,
+			cmd: func() error {
+				stateVar = "TRANSITION 0"
+				return nil
+			},
+		},
+		{
+			dry: false,
+			cmd: func() error {
+				stateVar = "TRANSITION 1"
+				return nil
+			},
+		},
+	}
+	logger := log.New(os.Stderr, "TEST: ", log.Ldate|log.Ltime|log.Lshortfile)
+	for i, c := range cases {
+		lastState = stateVar
+		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			g := Grunt{
+				Noop: c.dry,
+				Log:  logger,
+			}
+			err := g.Run(c.cmd)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-		}
+			if c.dry && stateVar != lastState {
+				t.Errorf("failed to no-op: %q", stateVar)
+			}
+			if !c.dry && stateVar == lastState {
+				t.Errorf("failed to  execute: %q", stateVar)
+			}
+		})
 	}
 }
